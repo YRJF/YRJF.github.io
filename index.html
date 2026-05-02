@@ -1,26 +1,688 @@
 <!DOCTYPE html>
-  <html lang="zh-CN">
-  <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>我的个人网站</title>
-      <style>
-          body {
-              font-family: system-ui, sans-serif;
-              max-width: 600px;
-              margin: 100px auto;
-              padding: 0 20px;
-              line-height: 1.6;
-              text-align: center;
-          }
-          h1 { color: #333; }
-          img { max-width: 100%; border-radius: 10px; }
-      </style>
-  </head>
-  <body>
-      <img src="https://picsum.photos/600/400" alt="随机图片">
-      <h1>你好，这是我的网站！</h1>
-      <p>五一放假做的第一个网站。</p>
-      <p>建于 2026年5月3日</p>
-  </body>
-  </html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数独 - Sudoku</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+.container {
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 30px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.header h1 {
+    color: #fff;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+.header h1 span { color: #f7971e; }
+.timer {
+    color: rgba(255,255,255,0.7);
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    background: rgba(255,255,255,0.08);
+    padding: 6px 14px;
+    border-radius: 10px;
+}
+.difficulty {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+.difficulty button {
+    flex: 1;
+    padding: 7px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.5);
+}
+.difficulty button:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.difficulty button.active {
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+    box-shadow: 0 4px 15px rgba(247,151,30,0.3);
+}
+.board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 1px;
+    background: rgba(255,255,255,0.15);
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 1;
+}
+.cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+    user-select: none;
+    position: relative;
+}
+.cell:hover { background: rgba(255,255,255,0.1); }
+.cell.prefilled { color: rgba(255,255,255,0.9); font-weight: 700; }
+.cell.user {
+    color: #64d8ff;
+    font-weight: 600;
+}
+.cell.selected {
+    background: rgba(108,99,255,0.35) !important;
+    box-shadow: inset 0 0 0 2px rgba(108,99,255,0.8);
+}
+.cell.highlighted { background: rgba(108,99,255,0.12); }
+.cell.same-num { background: rgba(108,99,255,0.2); }
+.cell.conflict { color: #ff6b6b !important; animation: shake 0.3s; }
+.cell.conflict.selected { background: rgba(255,107,107,0.25) !important; box-shadow: inset 0 0 0 2px rgba(255,107,107,0.8); }
+.cell.given-hint { animation: hintPop 0.4s ease; }
+@keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+}
+@keyframes hintPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); background: rgba(247,151,30,0.4); }
+    100% { transform: scale(1); }
+}
+.cell .notes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    width: 100%;
+    height: 100%;
+    padding: 2px;
+}
+.cell .notes span {
+    font-size: 9px;
+    color: rgba(255,255,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* 3x3 box borders */
+.cell:nth-child(3n) { border-right: 2px solid rgba(255,255,255,0.3); }
+.cell:nth-child(9n) { border-right: none; }
+.cell:nth-child(n+19):nth-child(-n+27) { border-bottom: 2px solid rgba(255,255,255,0.3); }
+.cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 2px solid rgba(255,255,255,0.3); }
+/* Remove the border-right for 3rd, 6th column cells within each row */
+/* Actually simpler: add thick borders after each 3 rows/cols via borders on specific cells */
+.board .cell.br3 { border-right: 2.5px solid rgba(255,255,255,0.5); }
+.board .cell.bb3 { border-bottom: 2.5px solid rgba(255,255,255,0.5); }
+
+.number-pad {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+    margin-top: 16px;
+}
+.number-pad button {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.8);
+}
+.number-pad button:hover { background: rgba(255,255,255,0.18); transform: translateY(-1px); }
+.number-pad button:active { transform: scale(0.92); }
+.number-pad button.completed { opacity: 0.25; pointer-events: none; }
+
+.actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+.actions button {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+.actions button:hover { background: rgba(255,255,255,0.14); color: #fff; }
+.actions button.active {
+    background: rgba(100,216,255,0.2);
+    color: #64d8ff;
+    box-shadow: inset 0 0 0 1.5px rgba(100,216,255,0.4);
+}
+.actions .new-game-btn {
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+}
+.actions .new-game-btn:hover { box-shadow: 0 4px 15px rgba(247,151,30,0.3); transform: translateY(-1px); }
+
+/* Win overlay */
+.win-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+}
+.win-overlay.show { display: flex; }
+.win-modal {
+    background: linear-gradient(135deg, #1a1a2e, #302b63);
+    border-radius: 24px;
+    padding: 48px 40px 36px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: modalPop 0.4s ease;
+}
+@keyframes modalPop {
+    0% { transform: scale(0.7); opacity: 0; }
+    70% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+.win-modal .trophy { font-size: 60px; margin-bottom: 12px; }
+.win-modal h2 { color: #ffd200; font-size: 28px; margin-bottom: 8px; }
+.win-modal p { color: rgba(255,255,255,0.6); margin-bottom: 6px; font-size: 15px; }
+.win-modal .win-time { color: #64d8ff; font-size: 36px; font-weight: 700; margin: 12px 0; }
+.win-modal button {
+    margin-top: 20px;
+    padding: 12px 40px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+    transition: all 0.2s;
+}
+.win-modal button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(247,151,30,0.3); }
+
+.mistakes {
+    color: rgba(255,255,255,0.4);
+    font-size: 13px;
+    margin-top: 12px;
+    text-align: center;
+}
+.mistakes span { color: #ff6b6b; }
+
+@media (max-width: 480px) {
+    .container { padding: 16px; border-radius: 16px; }
+    .header h1 { font-size: 20px; }
+    .cell { font-size: 17px; }
+    .cell .notes span { font-size: 7px; }
+    .number-pad button { font-size: 15px; }
+    .actions button { font-size: 12px; padding: 8px 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>数<span>独</span></h1>
+        <div class="timer" id="timer">00:00</div>
+    </div>
+
+    <div class="difficulty">
+        <button data-diff="easy" class="active">简单</button>
+        <button data-diff="medium">中等</button>
+        <button data-diff="hard">困难</button>
+    </div>
+
+    <div class="board" id="board"></div>
+
+    <div class="number-pad" id="numberPad"></div>
+
+    <div class="actions">
+        <button id="noteBtn">✏️ 笔记</button>
+        <button id="eraseBtn">🧹 擦除</button>
+        <button id="hintBtn">💡 提示</button>
+        <button id="newGameBtn" class="new-game-btn">🔄 新游戏</button>
+    </div>
+
+    <div class="mistakes">错误：<span id="mistakes">0</span> / 3</div>
+</div>
+
+<div class="win-overlay" id="winOverlay">
+    <div class="win-modal">
+        <div class="trophy">🏆</div>
+        <h2>恭喜通关！</h2>
+        <p>用时</p>
+        <div class="win-time" id="winTime">00:00</div>
+        <p id="winDiff" style="color:rgba(255,255,255,0.4);font-size:14px;"></p>
+        <button onclick="startNewGame()">再来一局</button>
+    </div>
+</div>
+
+<script>
+// ====== Sudoku Engine ======
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function isValid(grid, row, col, num) {
+    for (let i = 0; i < 9; i++) {
+        if (grid[row][i] === num) return false;
+        if (grid[i][col] === num) return false;
+    }
+    const br = Math.floor(row / 3) * 3, bc = Math.floor(col / 3) * 3;
+    for (let i = 0; i < 3; i++)
+        for (let j = 0; j < 3; j++)
+            if (grid[br + i][bc + j] === num) return false;
+    return true;
+}
+
+function solve(grid) {
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (grid[r][c] === 0) {
+                const nums = shuffle([1,2,3,4,5,6,7,8,9]);
+                for (const n of nums) {
+                    if (isValid(grid, r, c, n)) {
+                        grid[r][c] = n;
+                        if (solve(grid)) return true;
+                        grid[r][c] = 0;
+                    }
+                }
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function generatePuzzle(blanks) {
+    const grid = Array.from({length: 9}, () => Array(9).fill(0));
+    solve(grid);
+    const solution = grid.map(r => [...r]);
+    const puzzle = grid.map(r => [...r]);
+    const cells = [];
+    for (let i = 0; i < 9; i++)
+        for (let j = 0; j < 9; j++)
+            cells.push([i, j]);
+    shuffle(cells);
+    for (let k = 0; k < blanks; k++)
+        puzzle[cells[k][0]][cells[k][1]] = 0;
+    return { puzzle, solution };
+}
+
+function countSolutions(grid, limit) {
+    let count = 0;
+    function solve(g) {
+        if (count >= limit) return;
+        for (let r = 0; r < 9; r++) {
+            for (let c = 0; c < 9; c++) {
+                if (g[r][c] === 0) {
+                    for (let n = 1; n <= 9; n++) {
+                        if (isValid(g, r, c, n)) {
+                            g[r][c] = n;
+                            solve(g);
+                            if (count >= limit) return;
+                            g[r][c] = 0;
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+        count++;
+    }
+    const g = g.map(r => [...r]);
+    solve(g);
+    return count;
+}
+
+// ====== Game State ======
+let state = {
+    board: [],
+    solution: [],
+    puzzle: [],
+    notes: [],
+    selected: null,
+    noteMode: false,
+    difficulty: 'easy',
+    timer: 0,
+    timerInterval: null,
+    mistakes: 0,
+    gameOver: false,
+    started: false,
+};
+
+const DIFFICULTY_MAP = { easy: 30, medium: 45, hard: 55 };
+const DIFF_NAMES = { easy: '简单', medium: '中等', hard: '困难' };
+
+function formatTime(sec) {
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+}
+
+function getRelatedCells(row, col) {
+    const cells = [];
+    for (let i = 0; i < 9; i++) {
+        cells.push({r: row, c: i});
+        cells.push({r: i, c: col});
+    }
+    const br = Math.floor(row / 3) * 3, bc = Math.floor(col / 3) * 3;
+    for (let i = 0; i < 3; i++)
+        for (let j = 0; j < 3; j++)
+            cells.push({r: br + i, c: bc + j});
+    return cells;
+}
+
+// ====== UI Rendering ======
+const boardEl = document.getElementById('board');
+const timerEl = document.getElementById('timer');
+const mistakesEl = document.getElementById('mistakes');
+const winOverlay = document.getElementById('winOverlay');
+const winTime = document.getElementById('winTime');
+const winDiff = document.getElementById('winDiff');
+
+function render() {
+    boardEl.innerHTML = '';
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+
+            // 3x3 box borders
+            if (c % 3 === 2 && c !== 8) cell.classList.add('br3');
+            if (r % 3 === 2 && r !== 8) cell.classList.add('bb3');
+
+            const val = state.board[r][c];
+            const isPrefilled = state.puzzle[r][c] !== 0;
+
+            if (val !== 0) {
+                if (isPrefilled) {
+                    cell.classList.add('prefilled');
+                    cell.textContent = val;
+                } else {
+                    cell.classList.add('user');
+                    cell.textContent = val;
+                }
+            } else {
+                // Notes
+                const notes = state.notes[r][c];
+                if (notes && notes.length > 0) {
+                    const notesDiv = document.createElement('div');
+                    notesDiv.className = 'notes';
+                    for (let n = 1; n <= 9; n++) {
+                        const span = document.createElement('span');
+                        span.textContent = notes.includes(n) ? n : '';
+                        notesDiv.appendChild(span);
+                    }
+                    cell.appendChild(notesDiv);
+                }
+            }
+
+            // Highlights
+            if (state.selected) {
+                const { r: sr, c: sc } = state.selected;
+                if (r === sr && c === sc) {
+                    cell.classList.add('selected');
+                } else if (r === sr || c === sc ||
+                    (Math.floor(r/3) === Math.floor(sr/3) && Math.floor(c/3) === Math.floor(sc/3))) {
+                    cell.classList.add('highlighted');
+                }
+                const selVal = state.board[sr][sc];
+                if (selVal !== 0 && val === selVal && !(r === sr && c === sc)) {
+                    cell.classList.add('same-num');
+                }
+            }
+
+            // Conflicts
+            if (val !== 0 && !isPrefilled) {
+                const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+                let conflict = false;
+                for (let i = 0; i < 9 && !conflict; i++) {
+                    if (i !== c && state.board[r][i] === val) conflict = true;
+                    if (i !== r && state.board[i][c] === val) conflict = true;
+                }
+                for (let i = 0; i < 3 && !conflict; i++)
+                    for (let j = 0; j < 3 && !conflict; j++)
+                        if (br + i !== r || bc + j !== c)
+                            if (state.board[br + i][bc + j] === val) conflict = true;
+                if (conflict) cell.classList.add('conflict');
+            }
+
+            cell.addEventListener('click', () => selectCell(r, c));
+            boardEl.appendChild(cell);
+        }
+    }
+    updateNumberPad();
+}
+
+function updateNumberPad() {
+    const counts = Array(10).fill(0);
+    for (let r = 0; r < 9; r++)
+        for (let c = 0; c < 9; c++)
+            counts[state.board[r][c]]++;
+    document.querySelectorAll('#numberPad button').forEach(btn => {
+        const n = parseInt(btn.dataset.num);
+        btn.classList.toggle('completed', counts[n] >= 9);
+    });
+}
+
+function createNumberPad() {
+    const pad = document.getElementById('numberPad');
+    for (let n = 1; n <= 9; n++) {
+        const btn = document.createElement('button');
+        btn.textContent = n;
+        btn.dataset.num = n;
+        btn.addEventListener('click', () => placeNumber(n));
+        pad.appendChild(btn);
+    }
+}
+
+// ====== Game Logic ======
+function selectCell(row, col) {
+    if (state.gameOver) return;
+    state.selected = { r: row, c: col };
+    render();
+}
+
+function placeNumber(num) {
+    if (!state.selected || state.gameOver) return;
+    const { r, c } = state.selected;
+    if (state.puzzle[r][c] !== 0) return;
+
+    if (!state.started) startTimer();
+    state.started = true;
+
+    if (state.noteMode) {
+        if (!state.notes[r][c]) state.notes[r][c] = [];
+        const idx = state.notes[r][c].indexOf(num);
+        if (idx >= 0) state.notes[r][c].splice(idx, 1);
+        else state.notes[r][c].push(num);
+        state.notes[r][c].sort();
+    } else {
+        if (state.board[r][c] === num) return;
+        state.board[r][c] = num;
+        state.notes[r][c] = [];
+
+        if (num !== state.solution[r][c]) {
+            state.mistakes++;
+            mistakesEl.textContent = state.mistakes;
+            if (state.mistakes >= 3) {
+                gameOver(false);
+                return;
+            }
+        }
+
+        if (checkWin()) {
+            gameOver(true);
+            return;
+        }
+    }
+    render();
+}
+
+function eraseCell() {
+    if (!state.selected || state.gameOver) return;
+    const { r, c } = state.selected;
+    if (state.puzzle[r][c] !== 0) return;
+    state.board[r][c] = 0;
+    state.notes[r][c] = [];
+    render();
+}
+
+function giveHint() {
+    if (state.gameOver) return;
+    // Find all empty or wrong cells
+    const emptyCells = [];
+    for (let r = 0; r < 9; r++)
+        for (let c = 0; c < 9; c++)
+            if (state.puzzle[r][c] === 0 && state.board[r][c] !== state.solution[r][c])
+                emptyCells.push({r, c});
+    if (emptyCells.length === 0) return;
+    const { r, c } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    state.board[r][c] = state.solution[r][c];
+    state.notes[r][c] = [];
+    state.selected = { r, c };
+    if (!state.started) { startTimer(); state.started = true; }
+    render();
+    // Flash animation
+    const idx = r * 9 + c;
+    const el = boardEl.children[idx];
+    if (el) el.classList.add('given-hint');
+    if (checkWin()) gameOver(true);
+}
+
+function checkWin() {
+    for (let r = 0; r < 9; r++)
+        for (let c = 0; c < 9; c++)
+            if (state.board[r][c] !== state.solution[r][c]) return false;
+    return true;
+}
+
+function gameOver(won) {
+    state.gameOver = true;
+    if (state.timerInterval) clearInterval(state.timerInterval);
+    if (won) {
+        winTime.textContent = formatTime(state.timer);
+        winDiff.textContent = `难度：${DIFF_NAMES[state.difficulty]}`;
+        winOverlay.classList.add('show');
+    }
+}
+
+function startTimer() {
+    if (state.timerInterval) return;
+    state.timerInterval = setInterval(() => {
+        state.timer++;
+        timerEl.textContent = formatTime(state.timer);
+    }, 1000);
+}
+
+function startNewGame() {
+    winOverlay.classList.remove('show');
+    if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
+
+    const blanks = DIFFICULTY_MAP[state.difficulty];
+    const { puzzle, solution } = generatePuzzle(blanks);
+
+    state.board = puzzle.map(r => [...r]);
+    state.solution = solution;
+    state.puzzle = puzzle.map(r => [...r]);
+    state.notes = Array.from({length: 9}, () => Array(9).fill(null).map(() => []));
+    state.selected = null;
+    state.timer = 0;
+    state.mistakes = 0;
+    state.gameOver = false;
+    state.started = false;
+    timerEl.textContent = '00:00';
+    mistakesEl.textContent = '0';
+    render();
+}
+
+// ====== Keyboard ======
+document.addEventListener('keydown', e => {
+    if (state.gameOver) {
+        if (e.key === 'Enter') startNewGame();
+        return;
+    }
+    if (e.key >= '1' && e.key <= '9') placeNumber(parseInt(e.key));
+    if (e.key === 'Backspace' || e.key === 'Delete') eraseCell();
+    if (e.key === 'n' || e.key === 'N') toggleNoteMode();
+    if (e.key === 'ArrowUp' && state.selected) selectCell(Math.max(0, state.selected.r - 1), state.selected.c);
+    if (e.key === 'ArrowDown' && state.selected) selectCell(Math.min(8, state.selected.r + 1), state.selected.c);
+    if (e.key === 'ArrowLeft' && state.selected) selectCell(state.selected.r, Math.max(0, state.selected.c - 1));
+    if (e.key === 'ArrowRight' && state.selected) selectCell(state.selected.r, Math.min(8, state.selected.c + 1));
+});
+
+// ====== Controls ======
+function toggleNoteMode() {
+    state.noteMode = !state.noteMode;
+    document.getElementById('noteBtn').classList.toggle('active', state.noteMode);
+}
+
+// ====== Init ======
+createNumberPad();
+
+document.getElementById('noteBtn').addEventListener('click', toggleNoteMode);
+document.getElementById('eraseBtn').addEventListener('click', eraseCell);
+document.getElementById('hintBtn').addEventListener('click', giveHint);
+document.getElementById('newGameBtn').addEventListener('click', startNewGame);
+
+document.querySelectorAll('.difficulty button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.difficulty button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.difficulty = btn.dataset.diff;
+        startNewGame();
+    });
+});
+
+startNewGame();
+</script>
+</body>
+</html>
