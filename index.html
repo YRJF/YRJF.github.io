@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>数独 - Sudoku</title>
+<title>数独 - luyuhang</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -46,6 +46,14 @@ body {
     padding: 6px 14px;
     border-radius: 10px;
 }
+.author {
+    text-align: center;
+    color: rgba(255,255,255,0.3);
+    font-size: 12px;
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+}
+.author span { color: rgba(255,255,255,0.5); }
 .difficulty {
     display: flex;
     gap: 8px;
@@ -132,13 +140,10 @@ body {
     align-items: center;
     justify-content: center;
 }
-/* 3x3 box borders */
 .cell:nth-child(3n) { border-right: 2px solid rgba(255,255,255,0.3); }
 .cell:nth-child(9n) { border-right: none; }
 .cell:nth-child(n+19):nth-child(-n+27) { border-bottom: 2px solid rgba(255,255,255,0.3); }
 .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 2px solid rgba(255,255,255,0.3); }
-/* Remove the border-right for 3rd, 6th column cells within each row */
-/* Actually simpler: add thick borders after each 3 rows/cols via borders on specific cells */
 .board .cell.br3 { border-right: 2.5px solid rgba(255,255,255,0.5); }
 .board .cell.bb3 { border-bottom: 2.5px solid rgba(255,255,255,0.5); }
 
@@ -196,7 +201,6 @@ body {
 }
 .actions .new-game-btn:hover { box-shadow: 0 4px 15px rgba(247,151,30,0.3); transform: translateY(-1px); }
 
-/* Win overlay */
 .win-overlay {
     display: none;
     position: fixed;
@@ -267,6 +271,8 @@ body {
         <div class="timer" id="timer">00:00</div>
     </div>
 
+    <div class="author"><span>luyuhang</span> · 作者本人制作</div>
+
     <div class="difficulty">
         <button data-diff="easy" class="active">简单</button>
         <button data-diff="medium">中等</button>
@@ -299,6 +305,85 @@ body {
 </div>
 
 <script>
+// ====== Audio ======
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function ensureAudio() {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playPlaceSound() {
+    try {
+        ensureAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.15);
+    } catch(e) {}
+}
+
+function playErrorSound() {
+    try {
+        ensureAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.25);
+    } catch(e) {}
+}
+
+function playWinSound() {
+    try {
+        ensureAudio();
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            const t = audioCtx.currentTime + i * 0.15;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.12, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+            osc.start(t);
+            osc.stop(t + 0.25);
+        });
+    } catch(e) {}
+}
+
+function playNoteToggleSound() {
+    try {
+        ensureAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.08);
+    } catch(e) {}
+}
+
 // ====== Sudoku Engine ======
 function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -354,32 +439,6 @@ function generatePuzzle(blanks) {
     return { puzzle, solution };
 }
 
-function countSolutions(grid, limit) {
-    let count = 0;
-    function solve(g) {
-        if (count >= limit) return;
-        for (let r = 0; r < 9; r++) {
-            for (let c = 0; c < 9; c++) {
-                if (g[r][c] === 0) {
-                    for (let n = 1; n <= 9; n++) {
-                        if (isValid(g, r, c, n)) {
-                            g[r][c] = n;
-                            solve(g);
-                            if (count >= limit) return;
-                            g[r][c] = 0;
-                        }
-                    }
-                    return;
-                }
-            }
-        }
-        count++;
-    }
-    const g = g.map(r => [...r]);
-    solve(g);
-    return count;
-}
-
 // ====== Game State ======
 let state = {
     board: [],
@@ -405,19 +464,6 @@ function formatTime(sec) {
     return `${m}:${s}`;
 }
 
-function getRelatedCells(row, col) {
-    const cells = [];
-    for (let i = 0; i < 9; i++) {
-        cells.push({r: row, c: i});
-        cells.push({r: i, c: col});
-    }
-    const br = Math.floor(row / 3) * 3, bc = Math.floor(col / 3) * 3;
-    for (let i = 0; i < 3; i++)
-        for (let j = 0; j < 3; j++)
-            cells.push({r: br + i, c: bc + j});
-    return cells;
-}
-
 // ====== UI Rendering ======
 const boardEl = document.getElementById('board');
 const timerEl = document.getElementById('timer');
@@ -435,7 +481,6 @@ function render() {
             cell.dataset.row = r;
             cell.dataset.col = c;
 
-            // 3x3 box borders
             if (c % 3 === 2 && c !== 8) cell.classList.add('br3');
             if (r % 3 === 2 && r !== 8) cell.classList.add('bb3');
 
@@ -451,7 +496,6 @@ function render() {
                     cell.textContent = val;
                 }
             } else {
-                // Notes
                 const notes = state.notes[r][c];
                 if (notes && notes.length > 0) {
                     const notesDiv = document.createElement('div');
@@ -465,7 +509,6 @@ function render() {
                 }
             }
 
-            // Highlights
             if (state.selected) {
                 const { r: sr, c: sc } = state.selected;
                 if (r === sr && c === sc) {
@@ -480,7 +523,6 @@ function render() {
                 }
             }
 
-            // Conflicts
             if (val !== 0 && !isPrefilled) {
                 const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
                 let conflict = false;
@@ -545,6 +587,7 @@ function placeNumber(num) {
         if (idx >= 0) state.notes[r][c].splice(idx, 1);
         else state.notes[r][c].push(num);
         state.notes[r][c].sort();
+        playNoteToggleSound();
     } else {
         if (state.board[r][c] === num) return;
         state.board[r][c] = num;
@@ -553,10 +596,13 @@ function placeNumber(num) {
         if (num !== state.solution[r][c]) {
             state.mistakes++;
             mistakesEl.textContent = state.mistakes;
+            playErrorSound();
             if (state.mistakes >= 3) {
                 gameOver(false);
                 return;
             }
+        } else {
+            playPlaceSound();
         }
 
         if (checkWin()) {
@@ -578,7 +624,6 @@ function eraseCell() {
 
 function giveHint() {
     if (state.gameOver) return;
-    // Find all empty or wrong cells
     const emptyCells = [];
     for (let r = 0; r < 9; r++)
         for (let c = 0; c < 9; c++)
@@ -590,8 +635,8 @@ function giveHint() {
     state.notes[r][c] = [];
     state.selected = { r, c };
     if (!state.started) { startTimer(); state.started = true; }
+    playPlaceSound();
     render();
-    // Flash animation
     const idx = r * 9 + c;
     const el = boardEl.children[idx];
     if (el) el.classList.add('given-hint');
@@ -609,6 +654,7 @@ function gameOver(won) {
     state.gameOver = true;
     if (state.timerInterval) clearInterval(state.timerInterval);
     if (won) {
+        playWinSound();
         winTime.textContent = formatTime(state.timer);
         winDiff.textContent = `难度：${DIFF_NAMES[state.difficulty]}`;
         winOverlay.classList.add('show');
